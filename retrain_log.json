@@ -1,0 +1,13 @@
+[
+  {
+    "timestamp": "2026-06-07T21:55:26.429721",
+    "status": "replaced",
+    "old_auc": 1.0,
+    "new_auc": 1.0,
+    "delta_auc": 0.0,
+    "training_rows": 7500,
+    "positive_rate": 0.6433,
+    "new_interactions": 14940,
+    "forced": false
+  }
+]
