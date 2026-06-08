@@ -57,6 +57,56 @@ class PlanStatusUpdate(BaseModel):
 class RetrainRequest(BaseModel):
     force: bool = False
 
+class HealthProfileUpdate(BaseModel):
+    medical_group_id: Optional[int] = None
+    height_cm: Optional[float] = None
+    weight_kg: Optional[float] = None
+    cooper_meters: Optional[int] = None
+    push_ups: Optional[int] = None
+    pull_ups: Optional[int] = None
+    flexibility_cm: Optional[float] = None
+    sit_ups: Optional[int] = None
+    jump_forward: Optional[int] = None
+
+class InjuryCreate(BaseModel):
+    injury_type_id: int
+    diagnosis_date: date
+    recovery_date: Optional[date] = None
+    recovery_status: str = "active"
+
+class InjuryUpdate(BaseModel):
+    injury_type_id: Optional[int] = None
+    diagnosis_date: Optional[date] = None
+    recovery_date: Optional[date] = None
+    recovery_status: Optional[str] = None
+
+class MuscleFatigueUpdate(BaseModel):
+    status: Optional[str] = None  # "ACTIVE" or "NOT ACTIVE"
+    recovery_left: Optional[float] = None
+
+class ExerciseUpdate(BaseModel):
+    exercise_id: Optional[int] = None  # To replace the exercise
+    recommended_sets: Optional[int] = None
+    recommended_reps: Optional[int] = None
+    slot_type: Optional[str] = None
+    day_of_week: Optional[str] = None
+    order_in_session: Optional[int] = None
+
+class ExerciseCreate(BaseModel):
+    exercise_id: int
+    slot_type: str  # warmup, main, cooldown
+    day_of_week: str  # MONDAY, WEDNESDAY, FRIDAY
+    order_in_session: int
+    recommended_sets: int
+    recommended_reps: int
+
+class InteractionEdit(BaseModel):
+    completed: Optional[bool] = None
+    actually_sets: Optional[int] = None
+    actually_reps: Optional[int] = None
+    perceived_difficulty: Optional[str] = None
+    exercise_status: Optional[str] = None
+
 # ── /students ───────────────────────────────────────────────────────────────
 @app.get("/students/{student_id}", tags=["Students"])
 def get_student(student_id: int, user: dict = Depends(get_current_user)):
@@ -177,12 +227,12 @@ def get_plan_history(student_id: int, limit: int = Query(10, ge=1, le=50),
     return {"student_id": student_id, "plans": plans}
 
 @app.get("/plans/{plan_id}/exercises", tags=["Plans"])
-def get_plan_exercises(plan_id: int, user: dict = Depends(get_current_user)):
+def get_plan_exercises(plan_id: int):
     """Get all assigned exercises for a workout plan."""
     conn = get_connection()
-    cur = conn.cursor()
+    cur  = conn.cursor()
     cur.execute("""
-        SELECT ae.assigned_exercise_id, e.exercise_name, ae.slot_type,
+        SELECT ae.assigned_exercise_id, e.exercise_id, e.exercise_name, ae.slot_type,
                ae.day_of_week, ae.order_in_session, ae.predicted_score,
                ae.recommended_sets, ae.recommended_reps,
                COALESCE(saei.exercise_status, 'SCHEDULED') AS status,
@@ -196,20 +246,28 @@ def get_plan_exercises(plan_id: int, user: dict = Depends(get_current_user)):
         ORDER BY ae.day_of_week, ae.order_in_session
     """, (plan_id,))
     rows = cur.fetchall()
-    cur.close(); conn.close()
+    cur.close()
+    conn.close()
     if not rows:
         raise HTTPException(status_code=404, detail=f"Plan {plan_id} not found")
     return {
         "plan_id": plan_id,
         "exercises": [
             {
-                "assigned_exercise_id": r[0], "exercise_name": r[1], "slot_type": r[2],
-                "day_of_week": r[3], "order": r[4],
-                "predicted_score": float(r[5]) if r[5] else None,
-                "recommended_sets": r[6], "recommended_reps": r[7],
-                "status": r[8], "completed": r[9],
-                "actually_sets": r[10], "actually_reps": r[11],
-                "perceived_difficulty": r[12],
+                "assigned_exercise_id": r[0],
+                "exercise_id":          r[1],  # ← ДОБАВЛЕНО
+                "exercise_name":        r[2],
+                "slot_type":            r[3],
+                "day_of_week":          r[4],
+                "order":                r[5],
+                "predicted_score":      float(r[6]) if r[6] else None,
+                "recommended_sets":     r[7],
+                "recommended_reps":     r[8],
+                "status":               r[9],
+                "completed":            r[10],
+                "actually_sets":        r[11],
+                "actually_reps":        r[12],
+                "perceived_difficulty": r[13],
             }
             for r in rows
         ]
@@ -414,4 +472,265 @@ def root():
         "version": "1.0.0",
         "model_ready": os.path.exists(MODEL_PATH),
         "docs": "/docs",
+    }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TEACHER EDITING ENDPOINTS
+# ══════════════════════════════════════════════════════════════════════════════
+
+@app.put("/students/{student_id}/health-profile", tags=["Teacher"])
+def update_health_profile(student_id: int, update: HealthProfileUpdate):
+    """Update student health profile fields."""
+    conn = get_connection()
+    cur = conn.cursor()
+    
+    # Build dynamic update query
+    updates = []
+    values = []
+    for field, value in update.dict(exclude_none=True).items():
+        updates.append(f"{field} = %s")
+        values.append(value)
+    
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    values.append(student_id)
+    cur.execute(f"""
+        UPDATE students_health_profiles 
+        SET {', '.join(updates)}, measurement_date = CURRENT_DATE
+        WHERE student_id = %s
+        RETURNING health_profile_id
+    """, values)
+    
+    row = cur.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail="Health profile not found")
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"updated": True, "profile_id": row[0]}
+
+@app.post("/students/{student_id}/injuries", tags=["Teacher"])
+def add_injury(student_id: int, injury: InjuryCreate):
+    """Add a new injury record for a student."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO student_injury_history 
+            (student_id, injury_type_id, diagnosis_date, recovery_date, recovery_status)
+        VALUES (%s, %s, %s, %s, %s)
+        RETURNING injury_record_id
+    """, (student_id, injury.injury_type_id, injury.diagnosis_date, 
+          injury.recovery_date, injury.recovery_status))
+    new_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"created": True, "injury_record_id": new_id}
+
+@app.patch("/students/{student_id}/injuries/{injury_id}", tags=["Teacher"])
+def update_injury(student_id: int, injury_id: int, update: InjuryUpdate):
+    """Update an existing injury record."""
+    conn = get_connection()
+    cur = conn.cursor()
+    updates = []
+    values = []
+    for field, value in update.dict(exclude_none=True).items():
+        updates.append(f"{field} = %s")
+        values.append(value)
+    
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    values.extend([injury_id, student_id])
+    cur.execute(f"""
+        UPDATE student_injury_history 
+        SET {', '.join(updates)}
+        WHERE injury_record_id = %s AND student_id = %s
+        RETURNING injury_record_id
+    """, values)
+    
+    if not cur.fetchone():
+        raise HTTPException(status_code=404, detail="Injury not found")
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"updated": True}
+
+@app.delete("/students/{student_id}/injuries/{injury_id}", tags=["Teacher"])
+def delete_injury(student_id: int, injury_id: int):
+    """Delete an injury record."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        DELETE FROM student_injury_history 
+        WHERE injury_record_id = %s AND student_id = %s
+        RETURNING injury_record_id
+    """, (injury_id, student_id))
+    
+    if not cur.fetchone():
+        raise HTTPException(status_code=404, detail="Injury not found")
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"deleted": True}
+
+@app.patch("/students/{student_id}/muscle-fatigue/{fatigue_id}", tags=["Teacher"])
+def update_muscle_fatigue(student_id: int, fatigue_id: int, update: MuscleFatigueUpdate):
+    """Update muscle fatigue status (e.g., mark as recovered)."""
+    conn = get_connection()
+    cur = conn.cursor()
+    updates = []
+    values = []
+    for field, value in update.dict(exclude_none=True).items():
+        updates.append(f"{field} = %s")
+        values.append(value)
+    
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    values.extend([fatigue_id, student_id])
+    cur.execute(f"""
+        UPDATE muscle_fatigue 
+        SET {', '.join(updates)}
+        WHERE muscle_fatigue_id = %s AND student_id = %s
+        RETURNING muscle_fatigue_id
+    """, values)
+    
+    if not cur.fetchone():
+        raise HTTPException(status_code=404, detail="Fatigue record not found")
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"updated": True}
+
+@app.patch("/plans/{plan_id}/exercises/{assigned_exercise_id}", tags=["Teacher"])
+def update_plan_exercise(plan_id: int, assigned_exercise_id: int, update: ExerciseUpdate):
+    """Edit an exercise in a plan (change sets/reps or replace exercise)."""
+    conn = get_connection()
+    cur = conn.cursor()
+    updates = []
+    values = []
+    for field, value in update.dict(exclude_none=True).items():
+        updates.append(f"{field} = %s")
+        values.append(value)
+    
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    values.extend([assigned_exercise_id, plan_id])
+    cur.execute(f"""
+        UPDATE assigned_exercise 
+        SET {', '.join(updates)}
+        WHERE assigned_exercise_id = %s AND workout_plan_id = %s
+        RETURNING assigned_exercise_id
+    """, values)
+    
+    if not cur.fetchone():
+        raise HTTPException(status_code=404, detail="Exercise not found in plan")
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"updated": True}
+
+@app.delete("/plans/{plan_id}/exercises/{assigned_exercise_id}", tags=["Teacher"])
+def delete_plan_exercise(plan_id: int, assigned_exercise_id: int):
+    """Remove an exercise from a plan."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        DELETE FROM assigned_exercise 
+        WHERE assigned_exercise_id = %s AND workout_plan_id = %s
+        RETURNING assigned_exercise_id
+    """, (assigned_exercise_id, plan_id))
+    
+    if not cur.fetchone():
+        raise HTTPException(status_code=404, detail="Exercise not found in plan")
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"deleted": True}
+
+@app.post("/plans/{plan_id}/exercises", tags=["Teacher"])
+def add_exercise_to_plan(plan_id: int, exercise: ExerciseCreate):
+    """Add a new exercise to an existing plan."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO assigned_exercise 
+            (workout_plan_id, exercise_id, slot_type, day_of_week, 
+             order_in_session, recommended_sets, recommended_reps)
+        VALUES (%s, %s, %s, %s, %s, %s, %s)
+        RETURNING assigned_exercise_id
+    """, (plan_id, exercise.exercise_id, exercise.slot_type, exercise.day_of_week,
+          exercise.order_in_session, exercise.recommended_sets, exercise.recommended_reps))
+    new_id = cur.fetchone()[0]
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"created": True, "assigned_exercise_id": new_id}
+
+@app.patch("/interactions/{interaction_id}", tags=["Teacher"])
+def edit_interaction(interaction_id: int, update: InteractionEdit):
+    """Edit a student's interaction record (for history corrections)."""
+    conn = get_connection()
+    cur = conn.cursor()
+    updates = []
+    values = []
+    for field, value in update.dict(exclude_none=True).items():
+        updates.append(f"{field} = %s")
+        values.append(value)
+    
+    if not updates:
+        raise HTTPException(status_code=400, detail="No fields to update")
+    
+    values.append(interaction_id)
+    cur.execute(f"""
+        UPDATE student_assigned_exercise_interaction 
+        SET {', '.join(updates)}
+        WHERE assigned_exercise_interaction_id = %s
+        RETURNING assigned_exercise_interaction_id
+    """, values)
+    
+    if not cur.fetchone():
+        raise HTTPException(status_code=404, detail="Interaction not found")
+    
+    conn.commit()
+    cur.close()
+    conn.close()
+    return {"updated": True}
+
+@app.get("/exercises", tags=["Reference"])
+def get_all_exercises():
+    """Get list of all available exercises for selection."""
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT exercise_id, exercise_name, category_id, difficulty,
+               recommended_sets, recommended_reps
+        FROM exercises
+        ORDER BY category_id, exercise_name
+    """)
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    
+    return {
+        "exercises": [
+            {
+                "exercise_id": r[0],
+                "exercise_name": r[1],
+                "category_id": r[2],
+                "difficulty": r[3],
+                "recommended_sets": r[4],
+                "recommended_reps": r[5]
+            }
+            for r in rows
+        ]
     }
