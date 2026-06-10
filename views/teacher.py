@@ -131,13 +131,16 @@ def _tab_generate_plan(sid):
         st.info("Нет планов. Сгенерируйте первый!"); return
 
     latest_plan = plans_resp.json()["plans"][0]
-    st.markdown(f"**Последний план:** {latest_plan['date']} (ID: {latest_plan['plan_id']})")
-
+    
+    # Show the latest plan with all three days
+    st.markdown(f"## 📋 План от {latest_plan['date']} (ID: {latest_plan['plan_id']}) - {latest_plan['status']}")
+    
     ex_resp = api_request("GET", f"/plans/{latest_plan['plan_id']}/exercises")
     if ex_resp.status_code != 200:
-        return
+        st.error("Не удалось загрузить упражнения"); return
 
     exercises = ex_resp.json()["exercises"]
+    
     for day in ["MONDAY", "WEDNESDAY", "FRIDAY"]:
         day_exs = [e for e in exercises if e["day_of_week"] == day]
         if not day_exs:
