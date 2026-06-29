@@ -249,10 +249,9 @@ def get_student_profile(student_id: int) -> dict:
                    hp.flexibility_cm, hp.sit_ups, hp.jump_forward,
                    a.bmi, a.strength_score, a.endurance_score, a.flexibility_score
             FROM students s
-            JOIN students_health_profiles hp ON hp.health_profile_id = s.health_profile_id
-            JOIN students_physical_readiness_assessments a ON a.health_profile_id = hp.health_profile_id
+            JOIN students_health_profiles hp ON hp.student_id = s.student_id
+            LEFT JOIN students_physical_readiness_assessments a ON a.health_profile_id = hp.health_profile_id
             WHERE s.student_id = %s
-            ORDER BY a.assessment_date DESC
             LIMIT 1
         """, (student_id,))
         
@@ -290,11 +289,11 @@ def get_muscle_fatigue(student_id: int) -> dict:
     
     try:
         cur.execute("""
-            SELECT mg.muscle_group_name, mf.recovery_left, mf.status, mf.date
+            SELECT mg.muscle_name, mf.recovery_left, mf.status, mf.date
             FROM muscle_fatigue mf
             JOIN assigned_exercise_muscle_group aemg 
                 ON aemg.assigned_exercise_muscle_group_id = mf.assigned_exercise_muscle_group_id
-            JOIN muscle_groups mg ON mg.muscle_group_id = aemg.muscle_group_id
+            JOIN muscle_group mg ON mg.muscle_group_id = aemg.muscle_group_id
             WHERE mf.student_id = %s AND mf.status = 'ACTIVE'
             ORDER BY mf.date DESC
         """, (student_id,))
@@ -367,7 +366,7 @@ def get_plan_exercises(plan_id: int) -> List[dict]:
                    ae.day_of_week, ae.predicted_score
             FROM assigned_exercise ae
             JOIN exercises e ON e.exercise_id = ae.exercise_id
-            JOIN categories c ON c.category_id = e.category_id
+            JOIN exercise_categories c ON c.category_id = e.category_id
             WHERE ae.workout_plan_id = %s
             ORDER BY ae.day_of_week, ae.order_in_session
         """, (plan_id,))
@@ -487,13 +486,12 @@ def get_exercise_recommendations(student_id: int, category: str = None, limit: i
     try:
         # Get student's fitness level
         cur.execute("""
-            SELECT (a.strength_score + a.endurance_score + a.flexibility_score) / 3 as fitness_level,
+            SELECT (COALESCE(a.strength_score, 3) + COALESCE(a.endurance_score, 3) + COALESCE(a.flexibility_score, 3)) / 3 as fitness_level,
                    hp.medical_group_id
             FROM students s
-            JOIN students_health_profiles hp ON hp.health_profile_id = s.health_profile_id
-            JOIN students_physical_readiness_assessments a ON a.health_profile_id = hp.health_profile_id
+            JOIN students_health_profiles hp ON hp.student_id = s.student_id
+            LEFT JOIN students_physical_readiness_assessments a ON a.health_profile_id = hp.health_profile_id
             WHERE s.student_id = %s
-            ORDER BY a.assessment_date DESC
             LIMIT 1
         """, (student_id,))
         
@@ -512,7 +510,7 @@ def get_exercise_recommendations(student_id: int, category: str = None, limit: i
             SELECT e.exercise_id, e.exercise_name, e.difficulty, c.category_name,
                    e.recommended_sets, e.recommended_reps
             FROM exercises e
-            JOIN categories c ON c.category_id = e.category_id
+            JOIN exercise_categories c ON c.category_id = e.category_id
             WHERE e.difficulty <= %s
               AND e.exercise_id NOT IN (
                   SELECT ae.exercise_id
