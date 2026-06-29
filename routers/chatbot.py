@@ -31,9 +31,9 @@ router = APIRouter(prefix="/chat", tags=["Chatbot"])
 LLM_ENABLED = os.getenv("LLM_ENABLED", "true").lower() == "true"
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")  # Ollama default
 LLM_API_KEY = os.getenv("LLM_API_KEY", "ollama")
-LLM_MODEL = os.getenv("LLM_MODEL", "qwen2.5:3b")  # Changed to qwen2.5:3b for faster responses
+LLM_MODEL = os.getenv("LLM_MODEL", "qwen2.5:0.5b")  # Changed to ultra-fast 0.5b model for instant responses
 LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "600"))  # Increased from 15s to 600s (10 minutes)
-LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "150"))  # Decreased from 500 to 150 for faster responses
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "80"))  # Decreased from 150 to 80 for faster responses
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.7"))
 
 # Initialize LLM client if available and enabled
@@ -47,8 +47,9 @@ if LLM_AVAILABLE and LLM_ENABLED:
         )
         print(f"✅ LLM client initialized: {LLM_MODEL} at {LLM_BASE_URL}")
         print(f"   - Timeout: {LLM_TIMEOUT}s ({LLM_TIMEOUT // 60} min)")
-        print(f"   - Max Tokens: {LLM_MAX_TOKENS}")
+        print(f"   - Max Tokens: {LLM_MAX_TOKENS} (optimized for speed)")
         print(f"   - Temperature: {LLM_TEMPERATURE}")
+        print(f"   - Model: Ultra-fast qwen2.5:0.5b for instant chat responses")
     except Exception as e:
         print(f"⚠️  LLM client initialization failed: {e}. Falling back to template responses.")
         llm_client = None
@@ -595,6 +596,7 @@ def generate_llm_response(system_prompt: str, user_prompt: str, context_data: di
         print("⏳ Waiting for LLM response...")
         
         # Create completion with streaming enabled
+        # Note: timeout is set in client initialization, not here
         stream = llm_client.chat.completions.create(
             model=LLM_MODEL,
             messages=[
@@ -603,7 +605,6 @@ def generate_llm_response(system_prompt: str, user_prompt: str, context_data: di
             ],
             temperature=LLM_TEMPERATURE,
             max_tokens=LLM_MAX_TOKENS,
-            timeout=LLM_TIMEOUT,
             stream=True  # Enable streaming for faster perceived response
         )
         
