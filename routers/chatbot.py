@@ -31,9 +31,9 @@ router = APIRouter(prefix="/chat", tags=["Chatbot"])
 LLM_ENABLED = os.getenv("LLM_ENABLED", "true").lower() == "true"
 LLM_BASE_URL = os.getenv("LLM_BASE_URL", "http://localhost:11434/v1")  # Ollama default
 LLM_API_KEY = os.getenv("LLM_API_KEY", "ollama")
-LLM_MODEL = os.getenv("LLM_MODEL", "llama3.1:8b")
-LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "15"))  # seconds
-LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "500"))
+LLM_MODEL = os.getenv("LLM_MODEL", "qwen2.5:3b")  # Changed to qwen2.5:3b for faster responses
+LLM_TIMEOUT = int(os.getenv("LLM_TIMEOUT", "600"))  # Increased from 15s to 600s (10 minutes)
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "150"))  # Decreased from 500 to 150 for faster responses
 LLM_TEMPERATURE = float(os.getenv("LLM_TEMPERATURE", "0.7"))
 
 # Initialize LLM client if available and enabled
@@ -46,6 +46,9 @@ if LLM_AVAILABLE and LLM_ENABLED:
             timeout=LLM_TIMEOUT
         )
         print(f"✅ LLM client initialized: {LLM_MODEL} at {LLM_BASE_URL}")
+        print(f"   - Timeout: {LLM_TIMEOUT}s ({LLM_TIMEOUT // 60} min)")
+        print(f"   - Max Tokens: {LLM_MAX_TOKENS}")
+        print(f"   - Temperature: {LLM_TEMPERATURE}")
     except Exception as e:
         print(f"⚠️  LLM client initialization failed: {e}. Falling back to template responses.")
         llm_client = None
@@ -549,13 +552,19 @@ def get_exercise_recommendations(student_id: int, category: str = None, limit: i
 # ==================== LLM RESPONSE GENERATION ====================
 def generate_llm_response(system_prompt: str, user_prompt: str, context_data: dict = None) -> tuple[str, bool]:
     """
-    Generate a dynamic response using the LLM.
+    Generate a dynamic response using the LLM with streaming support.
     Returns (response_text, llm_used_flag)
     
     Falls back to None if LLM is unavailable, so caller can use template response.
+    Includes detailed console debugging to track the response generation process.
     """
+    import time
+    
     if not llm_client:
+        print("⚠️  LLM client not available. Using template response.")
         return None, False
+    
+    start_time = time.time()
     
     try:
         # Build enhanced prompt with context data if available
@@ -563,7 +572,30 @@ def generate_llm_response(system_prompt: str, user_prompt: str, context_data: di
         if context_data:
             full_user_prompt += f"\n\nContext Data:\n{context_data}"
         
-        completion = llm_client.chat.completions.create(
+        # Log request details
+        print("\n" + "="*80)
+        print("🤖 LLM REQUEST STARTED")
+        print("="*80)
+        print(f"⏰ Timestamp: {time.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"📦 Model: {LLM_MODEL}")
+        print(f"🌡️  Temperature: {LLM_TEMPERATURE}")
+        print(f"🔢 Max Tokens: {LLM_MAX_TOKENS}")
+        print(f"⏳ Timeout: {LLM_TIMEOUT}s")
+        print("-"*80)
+        print("📝 SYSTEM PROMPT:")
+        print(system_prompt[:200] + ("..." if len(system_prompt) > 200 else ""))
+        print("-"*80)
+        print("👤 USER PROMPT:")
+        print(user_prompt[:200] + ("..." if len(user_prompt) > 200 else ""))
+        if context_data:
+            print("-"*80)
+            print("📊 CONTEXT DATA:")
+            print(str(context_data)[:300] + ("..." if len(str(context_data)) > 300 else ""))
+        print("-"*80)
+        print("⏳ Waiting for LLM response...")
+        
+        # Create completion with streaming enabled
+        stream = llm_client.chat.completions.create(
             model=LLM_MODEL,
             messages=[
                 {"role": "system", "content": system_prompt},
@@ -571,14 +603,62 @@ def generate_llm_response(system_prompt: str, user_prompt: str, context_data: di
             ],
             temperature=LLM_TEMPERATURE,
             max_tokens=LLM_MAX_TOKENS,
-            timeout=LLM_TIMEOUT
+            timeout=LLM_TIMEOUT,
+            stream=True  # Enable streaming for faster perceived response
         )
         
-        response_text = completion.choices[0].message.content.strip()
+        # Collect streamed chunks
+        response_chunks = []
+        chunk_count = 0
+        first_chunk_time = None
+        
+        print("📡 Receiving stream...")
+        for chunk in stream:
+            if chunk.choices and len(chunk.choices) > 0:
+                delta = chunk.choices[0].delta
+                if delta.content:
+                    content = delta.content
+                    response_chunks.append(content)
+                    chunk_count += 1
+                    
+                    # Log first chunk timing
+                    if first_chunk_time is None:
+                        first_chunk_time = time.time()
+                        time_to_first = first_chunk_time - start_time
+                        print(f"✨ First token received in {time_to_first:.2f}s")
+                    
+                    # Log progress every 10 chunks
+                    if chunk_count % 10 == 0:
+                        elapsed = time.time() - start_time
+                        print(f"   Chunk #{chunk_count}, Elapsed: {elapsed:.2f}s, Content: '{content.strip()[:50]}...'")
+        
+        # Assemble final response
+        response_text = "".join(response_chunks).strip()
+        end_time = time.time()
+        total_time = end_time - start_time
+        
+        # Log response details
+        print("-"*80)
+        print("✅ LLM RESPONSE COMPLETED")
+        print("="*80)
+        print(f"⏱️  Total Time: {total_time:.2f}s")
+        print(f"📊 Chunks Received: {chunk_count}")
+        print(f"📝 Response Length: {len(response_text)} characters")
+        print(f"🔤 Tokens/sec (approx): {chunk_count / total_time:.1f}" if total_time > 0 else "")
+        print("-"*80)
+        print("💬 GENERATED RESPONSE:")
+        print(response_text[:500] + ("..." if len(response_text) > 500 else ""))
+        print("="*80 + "\n")
+        
         return response_text, True
         
     except Exception as e:
-        print(f"⚠️  LLM generation error: {e}")
+        end_time = time.time()
+        elapsed = end_time - start_time
+        print(f"\n❌ LLM GENERATION ERROR after {elapsed:.2f}s:")
+        print(f"   Error Type: {type(e).__name__}")
+        print(f"   Error Message: {str(e)}")
+        print("="*80 + "\n")
         return None, False
 
 
@@ -1025,18 +1105,19 @@ def chat(message: ChatMessage, user: dict = Depends(get_current_user)):
     
     Features:
     - Instant intent detection (keyword-based, milliseconds)
-    - LLM-powered personalized response generation
+    - LLM-powered personalized response generation with streaming
     - Full database integration for real student data
     - Multiple intent support (7 intents)
     - Graceful fallback to templates if LLM unavailable
     - Configurable via environment variables
+    - Detailed console debugging for monitoring LLM responses
     
     Environment Variables:
     - LLM_ENABLED: Enable/disable LLM (default: true)
     - LLM_BASE_URL: LLM API endpoint (default: http://localhost:11434/v1 for Ollama)
-    - LLM_MODEL: Model name (default: llama3.1:8b)
-    - LLM_TIMEOUT: Request timeout in seconds (default: 15)
-    - LLM_MAX_TOKENS: Max response tokens (default: 500)
+    - LLM_MODEL: Model name (default: qwen2.5:3b)
+    - LLM_TIMEOUT: Request timeout in seconds (default: 600 = 10 minutes)
+    - LLM_MAX_TOKENS: Max response tokens (default: 150)
     - LLM_TEMPERATURE: Response creativity (default: 0.7)
     """
     if not message.text or not message.text.strip():
