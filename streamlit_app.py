@@ -6,6 +6,7 @@ import streamlit as st
 from utils.api import api_request
 from views.student import render_dashboard, render_fatigue, render_plan, render_feedback
 from views.teacher import render_students, render_model
+from views.chatbot import render_chatbot
 
 st.set_page_config(
     page_title="Smart PE — ИИ-Тренер",
@@ -92,11 +93,13 @@ def main():
             st.Page(render_fatigue, title="💪 Мышцы", icon="💪"),
             st.Page(render_plan, title="📅 Планы", icon="📅"),
             st.Page(render_feedback, title="💬 Обратная связь", icon="💬"),
+            st.Page(render_chatbot, title="🤖 AI Coach", icon="🤖"),
         ]
     else:
         pages = [
             st.Page(render_students, title="👥 Студенты", icon="👥"),
             st.Page(render_model, title="🤖 Модель", icon="🤖"),
+            st.Page(render_chatbot, title="🤖 AI Coach", icon="🤖"),
         ]
 
     pg = st.navigation(pages)
