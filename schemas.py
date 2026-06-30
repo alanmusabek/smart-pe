@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
-from typing import Optional
-from datetime import date
+from typing import Optional, List
+from datetime import date, datetime
 
 class PlanRequest(BaseModel):
     student_id: int
@@ -11,6 +11,7 @@ class InteractionUpdate(BaseModel):
     completed: bool
     actually_sets: Optional[int] = None
     actually_reps: Optional[int] = None
+    actually_weight: Optional[float] = Field(None, description="Weight used in kg")
     perceived_difficulty: Optional[str] = Field(
         None, description="Very Easy | Easy | Normal | Hard | Very Hard"
     )
@@ -18,17 +19,21 @@ class InteractionUpdate(BaseModel):
     exercise_status: str = Field(
         "COMPLETED", description="COMPLETED | SKIPPED | DISCARDED | IN_PROGRESS"
     )
+
 class InteractionEdit(BaseModel):
     completed: Optional[bool] = None
     actually_sets: Optional[int] = None
     actually_reps: Optional[int] = None
+    actually_weight: Optional[float] = None
     perceived_difficulty: Optional[str] = None
     exercise_status: Optional[str] = None
+    feedback_notes: Optional[str] = None
     
 class PlanStatusUpdate(BaseModel):
     workout_plan_id: int
     workout_status: str = Field(description="COMPLETED | DISCARDED | SKIPPED | IN_PROGRESS")
     satisfaction: Optional[str] = Field(None, description="Liked | Disliked")
+    feedback_notes: Optional[str] = None
 
 class RetrainRequest(BaseModel):
     force: bool = False
@@ -75,3 +80,14 @@ class ExerciseCreate(BaseModel):
     order_in_session: int
     recommended_sets: int
     recommended_reps: int
+
+class WorkoutFeedback(BaseModel):
+    workout_plan_id: int
+    satisfaction: str = Field(description="Liked | Disliked | Neutral")
+    feedback_notes: Optional[str] = None
+    difficulty_rating: Optional[int] = Field(None, ge=1, le=5, description="1=Very Easy, 5=Very Hard")
+
+class QRAttendance(BaseModel):
+    student_id: int
+    class_id: int
+    qr_code: str
