@@ -64,7 +64,7 @@ def filter_exercises(student_id, exercises, conn):
     cur.execute("""
         SELECT DISTINCT jec.exercise_id
         FROM student_injury_history sih
-        JOIN jt_exercise_contraindications jec ON jec.injury_type_id = sih.injury_type_id
+        JOIN exercise_contraindications jec ON jec.injury_type_id = sih.injury_type_id
         WHERE sih.student_id = %s AND sih.recovery_status = 'active'
     """, (student_id,))
     contraindicated = {r[0] for r in cur.fetchall()}

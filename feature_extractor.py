@@ -4,17 +4,22 @@ Turns a (student_id, exercise_id) pair into a flat feature vector for XGBoost.
 """
 import psycopg2
 from datetime import date
+from core.settings import settings
 
-DB_CONFIG = {
-    "host": "localhost",
-    "port": 5432,
-    "database": "fitness_db",
-    "user": "postgres",
-    "password": "1234",
-}
+
+def _sync_db_url() -> str:
+    url = settings.DB_URL
+    if not url:
+        raise RuntimeError("DB_URL is not configured")
+    if "+asyncpg" in url:
+        return url.replace("+asyncpg", "")
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg2://" + url[len("postgresql://"):]
+    return url
+
 
 def get_connection():
-    return psycopg2.connect(**DB_CONFIG)
+    return psycopg2.connect(_sync_db_url())
 
 def extract_features(student_id: int, exercise_id: int, conn=None) -> dict:
     close_after = conn is None
@@ -70,7 +75,7 @@ def extract_features(student_id: int, exercise_id: int, conn=None) -> dict:
     # ── Injury contraindication check ────────────────────────────────────
     cur.execute("""
         SELECT COUNT(*) FROM student_injury_history sih
-        JOIN jt_exercise_contraindications jec ON jec.injury_type_id = sih.injury_type_id
+        JOIN exercise_contraindications jec ON jec.injury_type_id = sih.injury_type_id
         WHERE sih.student_id = %s
           AND jec.exercise_id = %s
           AND sih.recovery_status = 'active'
@@ -80,7 +85,7 @@ def extract_features(student_id: int, exercise_id: int, conn=None) -> dict:
 
     # ── Muscle freshness from muscle_fatigue table ────────────────────────
     cur.execute("""
-        SELECT muscle_group_id FROM jt_exercise_muscle_group
+        SELECT muscle_group_id FROM exercise_muscle_group
         WHERE exercise_id = %s
     """, (exercise_id,))
     muscle_group_ids = [r[0] for r in cur.fetchall()]
