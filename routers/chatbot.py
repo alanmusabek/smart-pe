@@ -406,7 +406,7 @@ def get_interaction_history(student_id: int, limit: int = 10) -> List[dict]:
             JOIN assigned_exercise ae ON ae.assigned_exercise_id = saei.assigned_exercise_id
             JOIN exercises e ON e.exercise_id = ae.exercise_id
             WHERE saei.student_id = %s
-            ORDER BY saei.interaction_date DESC, saei.created_at DESC
+            ORDER BY saei.interaction_date DESC
             LIMIT %s
         """, (student_id, limit))
         

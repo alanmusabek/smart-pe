@@ -117,9 +117,9 @@ def register(req: RegisterRequest):
 
     password_hash = hash_password(req.password)
     cur.execute(
-        """INSERT INTO users (email, password_hash, role, student_id)
-           VALUES (%s, %s, %s, %s) RETURNING user_id""",
-        (req.email, password_hash, req.role, req.student_id)
+        """INSERT INTO users (email, password_hash, role, student_id, is_active)
+           VALUES (%s, %s, %s, %s, %s) RETURNING user_id""",
+        (req.email, password_hash, req.role, req.student_id, True)
     )
     user_id = cur.fetchone()[0]
     conn.commit()
@@ -151,7 +151,7 @@ def login(req: LoginRequest):
 def get_me(user: dict = Depends(get_current_user)):
     conn = get_connection()
     cur = conn.cursor()
-    cur.execute("SELECT user_id, email, role, student_id FROM users WHERE user_id = %s", (user["user_id"],))
+    cur.execute("SELECT user_id, email, role, student_id, is_active FROM users WHERE user_id = %s", (user["user_id"],))
     row = cur.fetchone()
     cur.close(); conn.close()
     if not row:
