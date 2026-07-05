@@ -204,7 +204,7 @@ def explain_plan_ru(student_id: int, weekly_plan: list,
     cur.execute("""
         SELECT s.student_name, s.age, s.gender,
                hp.medical_group_id, a.strength_score,
-               a.endurance_score, a.flexibility_score, a.bmi
+               a.endurance_score, a.flexibility_score, a."BMI"
         FROM students s
         JOIN students_health_profiles hp ON hp.student_id = s.student_id
         JOIN students_physical_readiness_assessments a ON a.health_profile_id = hp.health_profile_id

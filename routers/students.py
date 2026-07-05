@@ -5,6 +5,10 @@ from schemas import HealthProfileUpdate, InjuryCreate, InjuryUpdate, MuscleFatig
 
 router = APIRouter(prefix="/students", tags=["Students"])
 
+@router.get("/me")
+def get_my_profile(user: dict = Depends(get_current_student)):
+    return get_student(user["student_id"], user)
+
 @router.get("/{student_id}")
 def get_student(student_id: int, user: dict = Depends(get_current_user)):
     if user["role"] == "student" and user["student_id"] != student_id:
@@ -16,7 +20,7 @@ def get_student(student_id: int, user: dict = Depends(get_current_user)):
         SELECT s.student_id, s.student_name, s.age, s.gender,
                hp.medical_group_id, mg.group_name, hp.height_cm, hp.weight_kg,
                hp.cooper_meters, hp.push_ups, hp.pull_ups, hp.flexibility_cm, 
-               hp.sit_ups, hp.jump_forward, hp.measurement_date, a.bmi, 
+               hp.sit_ups, hp.jump_forward, hp.measurement_date, a."BMI", 
                a.strength_score, a.endurance_score, a.flexibility_score
         FROM students s
         JOIN students_health_profiles hp ON hp.student_id = s.student_id
@@ -46,10 +50,6 @@ def get_student(student_id: int, user: dict = Depends(get_current_user)):
         "assessment_scores": {"strength": float(row[16]), "endurance": float(row[17]), "flexibility": float(row[18])},
         "measurement_date": str(row[14]), "active_injuries": injuries,
     }
-
-@router.get("/me")
-def get_my_profile(user: dict = Depends(get_current_student)):
-    return get_student(user["student_id"], user)
 
 @router.get("/{student_id}/muscle-fatigue")
 def get_muscle_fatigue(student_id: int, user: dict = Depends(get_current_user)):

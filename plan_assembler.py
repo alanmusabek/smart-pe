@@ -70,10 +70,11 @@ def filter_exercises(student_id, exercises, conn):
     contraindicated = {r[0] for r in cur.fetchall()}
     cur.close()
 
+    DIFFICULTY_MAP = {'low': 1, 'medium': 3, 'high': 5}
     return [
         ex for ex in exercises
         if ex["exercise_id"] not in contraindicated
-        and ex["difficulty"] <= max_difficulty
+        and DIFFICULTY_MAP.get(str(ex["difficulty"]).lower(), 3) <= max_difficulty
     ]
 
 def rank_exercises(student_id, exercises, model, conn):
