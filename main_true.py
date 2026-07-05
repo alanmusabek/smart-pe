@@ -77,7 +77,7 @@ def get_student(student_id: int, user: dict = Depends(get_current_user)):
                hp.cooper_meters, hp.push_ups, hp.pull_ups,
                hp.flexibility_cm, hp.sit_ups, hp.jump_forward,
                hp.measurement_date,
-               a.bmi, a.strength_score, a.endurance_score, a.flexibility_score
+               a."BMI", a.strength_score, a.endurance_score, a.flexibility_score
         FROM students s
         JOIN students_health_profiles hp ON hp.student_id = s.student_id
         JOIN medical_group mg ON mg.group_id = hp.medical_group_id

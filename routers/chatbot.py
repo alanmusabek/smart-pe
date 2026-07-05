@@ -251,7 +251,7 @@ def get_student_profile(student_id: int) -> dict:
                    hp.medical_group_id, hp.height_cm, hp.weight_kg,
                    hp.cooper_meters, hp.push_ups, hp.pull_ups,
                    hp.flexibility_cm, hp.sit_ups, hp.jump_forward,
-                   a.bmi, a.strength_score, a.endurance_score, a.flexibility_score
+                   a."BMI", a.strength_score, a.endurance_score, a.flexibility_score
             FROM students s
             JOIN students_health_profiles hp ON hp.student_id = s.student_id
             LEFT JOIN students_physical_readiness_assessments a ON a.health_profile_id = hp.health_profile_id
@@ -515,7 +515,12 @@ def get_exercise_recommendations(student_id: int, category: str = None, limit: i
                    e.recommended_sets, e.recommended_reps
             FROM exercises e
             JOIN exercise_categories c ON c.category_id = e.category_id
-            WHERE e.difficulty <= %s
+            WHERE CASE e.difficulty
+                WHEN 'low' THEN 1
+                WHEN 'medium' THEN 3
+                WHEN 'high' THEN 5
+                ELSE 3
+            END <= %s
               AND e.exercise_id NOT IN (
                   SELECT ae.exercise_id
                   FROM student_assigned_exercise_interaction saei

@@ -33,7 +33,7 @@ def extract_features(student_id: int, exercise_id: int, conn=None) -> dict:
                hp.medical_group_id, hp.height_cm, hp.weight_kg,
                hp.cooper_meters, hp.push_ups, hp.pull_ups,
                hp.flexibility_cm, hp.sit_ups, hp.jump_forward,
-               a.bmi, a.strength_score, a.endurance_score, a.flexibility_score
+               a."BMI", a.strength_score, a.endurance_score, a.flexibility_score
         FROM students s
         JOIN students_health_profiles hp ON hp.student_id = s.student_id
         JOIN students_physical_readiness_assessments a ON a.health_profile_id = hp.health_profile_id
@@ -63,14 +63,18 @@ def extract_features(student_id: int, exercise_id: int, conn=None) -> dict:
 
     difficulty, category_id, rec_sets, rec_reps, rest_sec = ex_row
 
+    # ── Difficulty is stored as VARCHAR ('low', 'medium', 'high') ────────
+    DIFFICULTY_MAP = {'low': 1, 'medium': 3, 'high': 5}
+    difficulty_num = DIFFICULTY_MAP.get(str(difficulty).lower(), 3)
+
     # ── Difficulty fit ────────────────────────────────────────────────────
     expected_difficulty = fitness_level * (5 / 4)
-    difficulty_gap = abs(expected_difficulty - difficulty)
+    difficulty_gap = abs(expected_difficulty - difficulty_num)
     difficulty_fit = max(0, 1 - difficulty_gap / 5)
 
     # ── Medical group safety ──────────────────────────────────────────────
     max_allowed = {1: 5, 2: 3, 3: 2}[mg_id]
-    medical_ok = 1 if difficulty <= max_allowed else 0
+    medical_ok = 1 if difficulty_num <= max_allowed else 0
 
     # ── Injury contraindication check ────────────────────────────────────
     cur.execute("""
@@ -181,7 +185,7 @@ def extract_features(student_id: int, exercise_id: int, conn=None) -> dict:
         "cooper_meters": cooper,
         "push_ups": push_ups,
         "pull_ups": pull_ups,
-        "difficulty": difficulty,
+        "difficulty": difficulty_num,
         "category_id": category_id,
         "rec_sets": rec_sets,
         "rec_reps": rec_reps,
