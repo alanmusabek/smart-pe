@@ -193,3 +193,25 @@ def update_muscle_fatigue(student_id: int, fatigue_id: int, update: MuscleFatigu
         raise HTTPException(status_code=404, detail="Fatigue record not found")
     conn.commit(); cur.close(); conn.close()
     return {"updated": True}
+
+@router.get("/leaderboard", tags=["Teacher"])
+def leaderboard(limit: int = 10, user: dict = Depends(get_current_teacher)):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT s.student_id, s.student_name, s.age, s.gender, mg.group_name,
+               a.endurance_score, a.strength_score, a.flexibility_score
+        FROM students s
+        JOIN students_health_profiles hp ON hp.student_id = s.student_id
+        JOIN medical_group mg ON mg.group_id = hp.medical_group_id
+        JOIN students_physical_readiness_assessments a ON a.health_profile_id = hp.health_profile_id
+        ORDER BY (COALESCE(a.endurance_score, 0) + COALESCE(a.strength_score, 0) + COALESCE(a.flexibility_score, 0)) DESC
+        LIMIT %s
+    """, (limit,))
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [{
+        "student_id": r[0], "name": r[1], "age": r[2], "gender": r[3],
+        "group_name": r[4],
+        "total_score": round(float(r[5]) + float(r[6]) + float(r[7]), 2),
+    } for r in rows]
