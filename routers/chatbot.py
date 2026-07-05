@@ -81,7 +81,9 @@ INTENTS = {
         "keywords": [
             "generate", "create", "new plan", "new workout", "weekly plan",
             "workout plan", "exercise plan", "training plan", "give me",
-            "i need", "want to", "make me", "build", "design"
+            "i need", "want to", "make me", "build", "design",
+            "план", "тренировк", "составь", "упражнен", "заняти",
+            "неделю", "программ", "спорт", "фитнес", "нагрузк"
         ],
         "patterns": [
             r"(generate|create|make|build|design)\s*(a|my|the)?\s*(workout|plan|exercise|training)",
@@ -89,6 +91,9 @@ INTENTS = {
             r"(give|get)\s*me\s*(a|my|the)?\s*(workout|plan)",
             r"what\s*(should|i\s*)?\s*(i\s*)?do\s*(today|this\s*week)?",
             r"(today|this\s*week)\s*(workout|plan|exercise)",
+            r"(составь|создай|сделай|напиши)\s*(мне|)\s*(план|программ|тренировк)",
+            r"(план|программа)\s*(тренировк|заняти|упражнен)",
+            r"(хочу|нужно|надо)\s*(трениров|занимать|план)",
         ],
         "description": "User wants to create or get a new workout plan"
     },
