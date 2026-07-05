@@ -5,6 +5,26 @@ from schemas import HealthProfileUpdate, InjuryCreate, InjuryUpdate, MuscleFatig
 
 router = APIRouter(prefix="/students", tags=["Students"])
 
+@router.get("")
+def list_students(user: dict = Depends(get_current_teacher)):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT s.student_id, s.student_name, s.age, s.gender,
+               hp.medical_group_id, mg.group_name, hp.height_cm, hp.weight_kg
+        FROM students s
+        JOIN students_health_profiles hp ON hp.student_id = s.student_id
+        JOIN medical_group mg ON mg.group_id = hp.medical_group_id
+        ORDER BY s.student_name
+    """)
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [{
+        "student_id": r[0], "name": r[1], "age": r[2], "gender": r[3],
+        "medical_group_id": r[4], "group_name": r[5],
+        "height_cm": r[6], "weight_kg": r[7],
+    } for r in rows]
+
 @router.get("/me")
 def get_my_profile(user: dict = Depends(get_current_student)):
     return get_student(user["student_id"], user)
@@ -95,6 +115,28 @@ def update_health_profile(student_id: int, update: HealthProfileUpdate, user: di
         raise HTTPException(status_code=404, detail="Health profile not found")
     conn.commit(); cur.close(); conn.close()
     return {"updated": True, "profile_id": row[0]}
+
+@router.get("/{student_id}/injuries")
+def list_injuries(student_id: int, user: dict = Depends(get_current_user)):
+    if user["role"] == "student" and user["student_id"] != student_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT sih.injury_record_id, it.type_name, it.body_region,
+               sih.diagnosis_date, sih.recovery_date, sih.recovery_status
+        FROM student_injury_history sih
+        JOIN injury_types it ON it.injury_type_id = sih.injury_type_id
+        WHERE sih.student_id = %s
+        ORDER BY sih.diagnosis_date DESC
+    """, (student_id,))
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [{
+        "id": r[0], "type": r[1], "region": r[2],
+        "diagnosis_date": str(r[3]), "recovery_date": str(r[4]) if r[4] else None,
+        "status": r[5],
+    } for r in rows]
 
 @router.post("/{student_id}/injuries", tags=["Teacher"])
 def add_injury(student_id: int, injury: InjuryCreate, user: dict = Depends(get_current_teacher)):
