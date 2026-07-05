@@ -29,6 +29,28 @@ def list_students(user: dict = Depends(get_current_teacher)):
 def get_my_profile(user: dict = Depends(get_current_student)):
     return get_student(user["student_id"], user)
 
+@router.get("/leaderboard", tags=["Teacher"])
+def leaderboard(limit: int = 10, user: dict = Depends(get_current_teacher)):
+    conn = get_connection()
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT s.student_id, s.student_name, s.age, s.gender,
+               hp.medical_group_id, mg.group_name,
+               COALESCE(a.strength_score, 0) + COALESCE(a.endurance_score, 0) + COALESCE(a.flexibility_score, 0) AS total_score
+        FROM students s
+        JOIN students_health_profiles hp ON hp.student_id = s.student_id
+        JOIN medical_group mg ON mg.group_id = hp.medical_group_id
+        JOIN students_physical_readiness_assessments a ON a.health_profile_id = hp.health_profile_id
+        ORDER BY total_score DESC LIMIT %s
+    """, (limit,))
+    rows = cur.fetchall()
+    cur.close(); conn.close()
+    return [{
+        "rank": i + 1,
+        "student_id": r[0], "name": r[1], "age": r[2], "gender": r[3],
+        "medical_group_id": r[4], "group_name": r[5], "total_score": round(float(r[6]), 1),
+    } for i, r in enumerate(rows)]
+
 @router.get("/{student_id}")
 def get_student(student_id: int, user: dict = Depends(get_current_user)):
     if user["role"] == "student" and user["student_id"] != student_id:
@@ -193,25 +215,3 @@ def update_muscle_fatigue(student_id: int, fatigue_id: int, update: MuscleFatigu
         raise HTTPException(status_code=404, detail="Fatigue record not found")
     conn.commit(); cur.close(); conn.close()
     return {"updated": True}
-
-@router.get("/leaderboard", tags=["Teacher"])
-def leaderboard(limit: int = 10, user: dict = Depends(get_current_teacher)):
-    conn = get_connection()
-    cur = conn.cursor()
-    cur.execute("""
-        SELECT s.student_id, s.student_name, s.age, s.gender, mg.group_name,
-               a.endurance_score, a.strength_score, a.flexibility_score
-        FROM students s
-        JOIN students_health_profiles hp ON hp.student_id = s.student_id
-        JOIN medical_group mg ON mg.group_id = hp.medical_group_id
-        JOIN students_physical_readiness_assessments a ON a.health_profile_id = hp.health_profile_id
-        ORDER BY (COALESCE(a.endurance_score, 0) + COALESCE(a.strength_score, 0) + COALESCE(a.flexibility_score, 0)) DESC
-        LIMIT %s
-    """, (limit,))
-    rows = cur.fetchall()
-    cur.close(); conn.close()
-    return [{
-        "student_id": r[0], "name": r[1], "age": r[2], "gender": r[3],
-        "group_name": r[4],
-        "total_score": round(float(r[5]) + float(r[6]) + float(r[7]), 2),
-    } for r in rows]
