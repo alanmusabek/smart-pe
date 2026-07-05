@@ -29,8 +29,8 @@ def list_students(user: dict = Depends(get_current_teacher)):
 def get_my_profile(user: dict = Depends(get_current_student)):
     return get_student(user["student_id"], user)
 
-@router.get("/leaderboard", tags=["Teacher"])
-def leaderboard(limit: int = 10, user: dict = Depends(get_current_teacher)):
+@router.get("/leaderboard", tags=["Students", "Teacher"])
+def leaderboard(limit: int = 10, user: dict = Depends(get_current_user)):
     conn = get_connection()
     cur = conn.cursor()
     cur.execute("""
