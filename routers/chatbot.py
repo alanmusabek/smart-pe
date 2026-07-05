@@ -312,7 +312,7 @@ def get_muscle_fatigue(student_id: int) -> dict:
             recovery_left = float(row[1]) if row[1] else 0
             status = row[2]
             
-            if muscle_name not in muscles or muscles[muscle_name]["recovery_left"] < recovery_left:
+            if muscle_name not in muscles or muscles[muscle_name]["recovery_left_hours"] < recovery_left:
                 muscles[muscle_name] = {
                     "recovery_left_hours": recovery_left,
                     "status": status,
