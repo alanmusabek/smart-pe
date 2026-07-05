@@ -683,7 +683,10 @@ def execute_generate_workout(student_id: int, message: str) -> dict:
         weekly_plan = generate_plan(student_id=student_id, save_to_db=True)
         
         # Get summary
-        total_exercises = sum(len(day.get("exercises", [])) for day in weekly_plan.get("days", []))
+        total_exercises = sum(
+            len(session.get("warmup", [])) + len(session.get("main", [])) + len(session.get("cooldown", []))
+            for session in weekly_plan
+        )
         
         # Prepare context for LLM
         profile = get_student_profile(student_id)
@@ -691,7 +694,7 @@ def execute_generate_workout(student_id: int, message: str) -> dict:
             "student_profile": profile,
             "weekly_plan_summary": {
                 "total_exercises": total_exercises,
-                "days_count": len(weekly_plan.get("days", []))
+                "days_count": len(weekly_plan)
             }
         }
         
@@ -706,7 +709,7 @@ Focus on:
 Keep responses concise (3-5 sentences), friendly, and actionable."""
 
         user_prompt = f"""The student said: "{message}"
-I've just generated a personalized weekly workout plan with {total_exercises} exercises across {len(weekly_plan.get("days", []))} days.
+I've just generated a personalized weekly workout plan with {total_exercises} exercises across {len(weekly_plan)} days.
 
 Student Profile:
 - Fitness Level: {(profile.get('strength_score', 0) + profile.get('endurance_score', 0) + profile.get('flexibility_score', 0)) / 3 if profile and profile.get('strength_score') else 3:.1f}/5
