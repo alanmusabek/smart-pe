@@ -6,7 +6,7 @@ Docs: http://localhost:8000/docs
 import os
 from fastapi import FastAPI
 from auth import router as auth_router
-from routers import students, plans, interactions, model, explain, reference, chatbot
+from routers import students, plans, interactions, model, explain, reference, chatbot, attendance, activity, achievements
 
 app = FastAPI(
     title="Smart PE — Workout Recommendation API",
@@ -23,6 +23,9 @@ app.include_router(model.router)
 app.include_router(explain.router)
 app.include_router(reference.router)
 app.include_router(chatbot.router)
+app.include_router(attendance.router)
+app.include_router(activity.router)
+app.include_router(achievements.router)
 
 MODEL_PATH = "fitness_ranker.pkl"
 
