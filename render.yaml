@@ -1,13 +1,26 @@
 services:
   - type: web
     name: smart-pe-demo
-    runtime: docker
+    runtime: python
     plan: free
     region: frankfurt
-    dockerfilePath: ./Dockerfile.demo
+    buildCommand: pip install -r requirements-server.txt && npm ci --prefix frontend --include=dev && npm run build --prefix frontend
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT --workers 1
     healthCheckPath: /health
     autoDeployTrigger: "off"
     envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: PYTHONDONTWRITEBYTECODE
+        value: "1"
+      - key: OMP_NUM_THREADS
+        value: "1"
+      - key: OPENBLAS_NUM_THREADS
+        value: "1"
+      - key: MKL_NUM_THREADS
+        value: "1"
       - key: DB_URL
         fromDatabase:
           name: smart-pe-demo-db
@@ -47,7 +60,7 @@ databases:
   - name: smart-pe-demo-db
     plan: free
     region: frankfurt
-    databaseName: smart_pe_demo
-    user: smart_pe_demo
+    databaseName: smart_pe_demo_db
+    user: smart_pe_demo_db_user
     postgresMajorVersion: "17"
     ipAllowList: []

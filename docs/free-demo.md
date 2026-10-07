@@ -29,7 +29,9 @@ The deployment branch is `codex/free-cloud-demo`. It contains the application so
 
 These steps follow the [Render Blueprint setup](https://render.com/docs/infrastructure-as-code). Names can acquire suffixes if resources with those names already exist; always use the address displayed for your new web service.
 
-No separate frontend hosting, database migration command, or laptop tunnel is required. `Dockerfile.demo` packages React and the backend together. Render supplies the database connection and generates authentication secrets automatically. The database accepts the application's internal Render connection; external access is disabled in the Blueprint.
+No separate frontend hosting, database migration command, or laptop tunnel is required. Render's Python runtime builds React during deployment and serves it through FastAPI. `.python-version` selects Python 3.12 and `NODE_VERSION=22` selects Node.js. `Dockerfile.demo` remains an alternative container build. The Blueprint supplies the database connection and generates authentication secrets automatically. The database accepts the application's internal Render connection; external access is disabled.
+
+If the resources are created directly through the Render integration instead of a Blueprint, the connector might not expose the database connection URL. In that case, open the demo database in Render, copy its **Internal Database URL**, then paste it privately into the web service's **Environment** variable named **`DB_URL`**. Save and deploy the environment change. The generated authentication secrets and demo passwords are already stored in that same Environment page. Do not send the connection URL through chat or commit it to GitHub. Do not create a second Blueprint for an existing deployment.
 
 ## 3. Sign in to the demo
 
@@ -89,7 +91,7 @@ An hour of normal interaction is a reasonable use of this demo setup, provided t
 
 ## 6. Restarting and updating later
 
-Render starts the backend automatically with the container's command and its assigned port. If a deployment fails, read the service's **Logs** and deployment events in the dashboard first.
+Render starts the backend automatically with the configured start command and its assigned port. If a deployment fails, read the service's **Logs** and deployment events in the dashboard first.
 
 To deploy source changes, push an updated deployment snapshot to `codex/free-cloud-demo`, then use the web service's **Manual Deploy** action to deploy the latest commit. Auto-deployment is disabled to avoid a surprise update during the presentation. Ordinary restarts reuse the demo database and the bundled ranking model. A restart clears in-memory chatbot conversations; start a new conversation if the old one expires.
 
