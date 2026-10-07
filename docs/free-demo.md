@@ -2,7 +2,18 @@
 
 This setup runs the React website, FastAPI backend and a separate fictional PostgreSQL database on Render. A Groq account supplies the optional chatbot language model. After deployment, your computer can be switched off: Render runs the server and visitors only need an internet connection and a browser.
 
-**Deployment files are prepared; creating these files does not publish a website.** A working public address is available only after Render finishes deploying the service. Keep the final address and account passwords privately for the presentation.
+**Deployment verified on 7 October 2026.** The website, teacher/student logins, profiles, workout history, recommendation generation, explanations and chatbot fallback replies passed public HTTP checks. Groq generation remains disabled until you add your own API key. Keep the account passwords privately for the presentation.
+
+| Your resource | Address |
+| --- | --- |
+| Website | [Smart PE](https://smart-pe-demo.onrender.com/app/) |
+| Web service dashboard | [smart-pe-demo](https://dashboard.render.com/web/srv-db30svu0tbcc738b7as0) |
+| Private environment settings | [Environment](https://dashboard.render.com/web/srv-db30svu0tbcc738b7as0/env) |
+| Demo database dashboard | [smart-pe-demo-db](https://dashboard.render.com/d/dpg-db30qhgm7kps73ckhqrg-a) |
+
+The database's **Internal Database URL** is already configured privately as **`DB_URL`**. Its password is not exposed by the connected integration. For generated chatbot replies, set **`LLM_API_KEY`** privately to your Groq key and **`LLM_ENABLED=true`**, then save/deploy. Do not paste their values into chat or GitHub.
+
+This free database expires on **6 November 2026**. Complete the demonstration before that date.
 
 ## 1. Accounts you need
 
@@ -16,7 +27,7 @@ You do not need a domain, a paid OpenAI subscription, Django, or a locally insta
 
 For a completely free demonstration, keep both Render resources on **Free** and stay within the included usage. Do not enable paid upgrades. If the signup flow requests account verification, complete that in your own browser. Do not send account passwords or API keys through chat. [Render free plans](https://render.com/docs/free) and [Groq billing](https://console.groq.com/docs/billing-faqs) describe the provider rules.
 
-## 2. Deploy the application
+## 2. Create a new deployment (skip if using the resources above)
 
 The deployment branch is `codex/free-cloud-demo`. It contains the application source, model artifact, fictional database initializer and `render.yaml`; it excludes local credentials, student exports, training records and reports.
 
@@ -35,7 +46,7 @@ If the resources are created directly through the Render integration instead of 
 
 ## 3. Sign in to the demo
 
-In the web service's **Environment** settings, reveal and copy the generated values listed below. Keep the passwords private.
+In the web service's **Environment** settings, reveal and copy the securely generated values listed below. Keep the passwords private. A private local copy of the two demo account logins is also saved in `.runtime/render-demo-accounts.txt`; it is excluded from Git.
 
 | Role | Email | Password environment variable |
 | --- | --- | --- |
@@ -74,7 +85,7 @@ Groq hosts the model, so Ollama does not need to run on Render or your computer.
 
 With generation enabled, the chatbot sends the fictional student's cached context and recent conversation to Groq. It loads student data from the database at the beginning of a conversation and reuses that snapshot until application changes invalidate it. The external chat API is stateless, so the cached context still accompanies model requests.
 
-**After enabling chat, disable automatic Blueprint syncing in its settings.** The initial YAML sets `LLM_ENABLED=false`; syncing it again could overwrite your dashboard change. Service code auto-deployment is already off. Update the Blueprint deliberately if you later want it to manage the enabled setting.
+**If you created a Blueprint, disable automatic Blueprint syncing after enabling chat.** The initial YAML sets `LLM_ENABLED=false`; syncing it again could overwrite your dashboard change. The resources linked above were created directly and have no Blueprint to sync. Service code auto-deployment is already off. Update the Blueprint deliberately if you later want it to manage the enabled setting.
 
 ## 5. How to run it for the dean
 
