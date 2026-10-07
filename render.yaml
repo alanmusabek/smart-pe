@@ -1,0 +1,53 @@
+services:
+  - type: web
+    name: smart-pe-demo
+    runtime: docker
+    plan: free
+    region: frankfurt
+    dockerfilePath: ./Dockerfile.demo
+    healthCheckPath: /health
+    autoDeployTrigger: "off"
+    envVars:
+      - key: DB_URL
+        fromDatabase:
+          name: smart-pe-demo-db
+          property: connectionString
+      - key: ACCESS_TOKEN_SECRET_KEY
+        generateValue: true
+      - key: REFRESH_TOKEN_SECRET_KEY
+        generateValue: true
+      - key: ALGORITHM
+        value: HS256
+      - key: PUBLIC_REGISTRATION_ENABLED
+        value: "false"
+      - key: DEMO_MODE
+        value: "true"
+      - key: DEMO_TEACHER_PASSWORD
+        generateValue: true
+      - key: DEMO_STUDENT_PASSWORD
+        generateValue: true
+      - key: MODEL_RETRAIN_ENABLED
+        value: "false"
+      # Enable chat in Environment after adding your free Groq API key.
+      - key: LLM_ENABLED
+        value: "false"
+      - key: LLM_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: LLM_MODEL
+        value: qwen/qwen3.8-27b
+      - key: LLM_REASONING_EFFORT
+        value: none
+      - key: LLM_TIMEOUT
+        value: "15"
+      - key: LLM_MAX_TOKENS
+        value: "400"
+      - key: LLM_TEMPERATURE
+        value: "0.7"
+databases:
+  - name: smart-pe-demo-db
+    plan: free
+    region: frankfurt
+    databaseName: smart_pe_demo
+    user: smart_pe_demo
+    postgresMajorVersion: "17"
+    ipAllowList: []
