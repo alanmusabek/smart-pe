@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 versions/__pycache__/
 *.pyc
+
+# Local secrets
+.env
+.env.*
+!.env.example
